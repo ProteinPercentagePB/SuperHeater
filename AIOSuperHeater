@@ -1,0 +1,387 @@
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+
+import org.powerbot.core.event.listeners.PaintListener;
+import org.powerbot.core.script.ActiveScript;
+import org.powerbot.core.script.job.Task;
+import org.powerbot.core.script.job.state.Node;
+import org.powerbot.core.script.job.state.Tree;
+import org.powerbot.game.api.Manifest;
+import org.powerbot.game.api.methods.input.Mouse;
+import org.powerbot.game.api.methods.node.SceneEntities;
+import org.powerbot.game.api.methods.tab.Inventory;
+import org.powerbot.game.api.methods.widget.Bank;
+import org.powerbot.game.api.methods.widget.Camera;
+import org.powerbot.game.api.util.Random;
+import org.powerbot.game.api.util.Time;
+import org.powerbot.game.api.wrappers.node.Item;
+import org.powerbot.game.api.wrappers.node.SceneObject;
+
+@Manifest(authors = "ProteinPercentage", name = "AIO Super Heater", version = 0.1)
+public class AIOSuperHeater extends ActiveScript implements PaintListener {
+
+  private final int tinOre = 438;
+	private final int copperOre = 436;
+	private final int ironOre = 440;
+	private final int coalOre = 453;
+	private final int goldOre = 444;
+	private final int mithrilOre = 447;
+	private final int adamantiteOre = 449;
+	private final int runiteOre = 451;
+	private final int bronzeBar = 2349;
+	private final int ironBar = 2351;
+	private final int steelBar = 2353;
+	private final int goldBar = 2357;
+	private final int mithrilBar = 2359;
+	private final int adamantiteBar = 2361;
+	private final int runeBar = 2363;
+	private final int natureRune = 561;
+
+	private int oreChosen1;
+	private int oreChosen2;
+	private int oreAmount1;
+	private int oreAmount2;
+	private int barAmount;
+	private int barResult;
+	private double smithExp;
+	private int magicExp;
+
+	private boolean startHeat = false;
+	private boolean startingUp = false;
+	private boolean bankTime = false;
+
+	AIOSuperGUI g = new AIOSuperGUI();
+	public boolean guiWait = true;
+
+	private Tree jobs = null;
+	private final int[] bankBooth = { 782 };
+
+	String Status = "";
+	private int barsMade, totalmagicExp;
+	private double totalsmithExp;
+	long startTime;
+
+	public int loop() {
+		if (jobs == null) {
+			jobs = new Tree(new Node[] { new heatMethod(), new bankMethod() });
+		}
+		final Node job = jobs.state();
+		if (job != null) {
+			jobs.set(job);
+			getContainer().submit(job);
+			job.join();
+			return 100;
+		}
+		return Random.nextInt(200, 300);
+	}
+
+	public void onStart() {
+		startingUp = true;
+		g.setVisible(true);
+		while (guiWait) {
+
+		}
+		Mouse.setSpeed(Mouse.Speed.FAST);
+		startTime = System.currentTimeMillis();
+		Status = "Starting up...";
+		checkInventory();
+		prepareInventory();
+	}
+
+	public void checkInventory() {
+		SceneObject BankBooth = SceneEntities.getNearest(bankBooth);
+		BankBooth.interact("Bank", "Bank Booth");
+		Task.sleep(800, 900);
+		Bank.depositInventory();
+	}
+
+	public void prepareInventory() {
+		// SceneObject BankBooth = SceneEntities.getNearest(bankBooth);
+		// BankBooth.interact("Bank", "Bank booth");
+		Task.sleep(600, 700);
+		Bank.withdraw(natureRune, Bank.Amount.ALL);
+		Task.sleep(600, 700);
+		Bank.withdraw(oreChosen1, oreAmount1);
+		Task.sleep(600, 700);
+		if (oreChosen2 >= 300) {
+			Bank.withdraw(oreChosen2, oreAmount2);
+			Task.sleep(600, 700);
+			Bank.close();
+			startHeat = true;
+			startingUp = false;
+		} else {
+			startHeat = true;
+			startingUp = false;
+			Bank.close();
+		}
+	}
+	public void isDone() {
+		if (Inventory.getCount(oreChosen1) == 0) {
+			startHeat = false;
+		} else {
+			startHeat = true;
+		}
+	}
+
+	public class heatMethod extends Node {
+
+		@Override
+		public void execute() {
+			if (Inventory.getCount(oreChosen1) < 1
+					|| Inventory.getCount(oreChosen2) < 1) {
+				startHeat = false;
+				bankTime = true;
+			}
+			Status = "Super Heating...";
+			for (Item item : Inventory.getItems()) {
+				if (item.getId() == oreChosen1) {
+					Task.sleep(1000, 1100);
+					Mouse.click((50 + Random.nextInt(1, 10)),
+								(350 + Random.nextInt(1, 20)), true);
+					Task.sleep(700, 800);
+					item.getWidgetChild().click(true);
+					barsMade++;
+					Task.sleep(500, 600);
+				}
+			}
+		}
+
+		@Override
+		public boolean activate() {
+
+			return !Bank.isOpen() && startHeat == true && startingUp == false;
+		}
+	}
+
+	public class bankMethod extends Node {
+
+		@Override
+		public void execute() {
+			Status = "Banking...";
+			SceneObject BankBooth = SceneEntities.getNearest(bankBooth);
+			Camera.turnTo(BankBooth);
+			Task.sleep(800, 900);
+			BankBooth.interact("Bank", "Bank booth");
+			Task.sleep(1000, 1100);
+			Bank.deposit(barResult, barAmount);
+			if (Inventory.getCount(barAmount) > 1) {
+				Bank.deposit(barResult, barAmount);
+				Task.sleep(1000, 1100);
+			}
+			Task.sleep(600, 700);
+			Bank.withdraw(oreChosen1, oreAmount1);
+			Task.sleep(600, 700);
+			if (oreChosen2 >= 300) {
+				Bank.withdraw(oreChosen2, oreAmount2);
+				Task.sleep(600, 700);
+				startHeat = true;
+				bankTime = false;
+				Bank.close();
+			} else {
+				startHeat = true;
+				bankTime = false;
+				Bank.close();
+			}
+		}
+
+		@Override
+		public boolean activate() {
+			return startHeat == false && startingUp == false
+					&& bankTime == true;
+		}
+
+	}
+
+	private final Color color1 = new Color(0, 0, 0);
+    private final Color color2 = new Color(255, 255, 255);
+
+    private final BasicStroke stroke1 = new BasicStroke(1);
+
+    private final Font font1 = new Font("SimHei", 1, 14);
+    private final Font font2 = new Font("SimHei", 0, 12);
+
+    public void onRepaint(Graphics g1) {
+        Graphics2D g = (Graphics2D)g1;
+        totalsmithExp = (barsMade*smithExp);
+        totalmagicExp = (barsMade*magicExp);
+        g.setColor(color1);
+        g.fillRect(4, 279, 513, 46);
+        g.setStroke(stroke1);
+        g.drawRect(4, 279, 513, 46);
+        g.setFont(font1);
+        g.setColor(color2);
+        g.drawString("AIO Super Heater", 6, 293);
+        g.setFont(font2);
+        g.drawString("Time Running: "+Time.format(System.currentTimeMillis() - startTime), 5, 321);
+        g.drawString("Status: "+Status, 5, 308);
+        g.drawString("Bars Made: "+barsMade, 168, 310);
+        g.drawString("Smithing Exp: "+totalsmithExp, 169, 322);
+        g.drawString("Magic Exp: "+totalmagicExp, 337, 310);
+    }
+
+	class AIOSuperGUI extends JFrame {
+		public AIOSuperGUI() {
+			initComponents();
+		}
+
+		private void button1ActionPerformed(ActionEvent e) {
+			String chosen = oretoBar.getSelectedItem().toString();
+			if (chosen.contains("Bronze Bar")) {
+				System.out
+						.println("AIO Super Heater: Script has been started and is smelting Bronze Bars");
+				oreChosen1 = tinOre;
+				oreChosen2 = copperOre;
+				oreAmount1 = 13;
+				oreAmount2 = 13;
+				barAmount = 13;
+				barResult = bronzeBar;
+				smithExp = 6.2;
+				magicExp = 53;
+			}
+			if (chosen.contains("Iron Bar")) {
+				System.out
+						.println("AIO Super Heater: Script has been started and is smelting Iron Bars");
+				oreChosen1 = ironOre;
+				oreAmount1 = 27;
+				barAmount = 27;
+				barResult = ironBar;
+				smithExp = 12.5;
+				magicExp = 53;
+			}
+			if (chosen.contains("Steel Bar")) {
+				System.out
+						.println("AIO Super Heater: Script has been started and is smelting Steel Bars");
+				oreChosen1 = coalOre;
+				oreChosen2 = ironOre;
+				oreAmount1 = 8;
+				oreAmount2 = 16;
+				barAmount = 8;
+				barResult = steelBar;
+				smithExp = 17.5;
+				magicExp = 53;
+			}
+			if (chosen.contains("Gold Bar")) {
+				System.out
+						.println("AIO Super Heater: Script has been started and is smelting Gold Bars");
+				oreChosen1 = goldOre;
+				oreAmount1 = 27;
+				barAmount = 27;
+				barResult = goldBar;
+				smithExp = 56.2;
+				magicExp = 53;
+				
+			}
+			if (chosen.contains("Mithril Bar")) {
+				System.out
+						.println("AIO Super Heater: Script has been started and is smelting Mithril Bars");
+				oreChosen1 = coalOre;
+				oreChosen2 = mithrilOre;
+				oreAmount1 = 5;
+				oreAmount2 = 20;
+				barAmount = 5;
+				barResult = mithrilBar;
+				smithExp = 30;
+				magicExp = 53;
+			}
+			if (chosen.contains("Adamantite Bar")) {
+				System.out
+						.println("AIO Super Heater: Script has been started and is smelting Adamantite Bars");
+				oreChosen1 = coalOre;
+				oreChosen2 = adamantiteOre;
+				oreAmount1 = 4;
+				oreAmount2 = 18;
+				barAmount = 4;
+				barResult = adamantiteBar;
+				smithExp = 37.5;
+				magicExp = 53;
+			}
+			if (chosen.contains("Runite Bar")) {
+				System.out
+						.println("AIO Super Heater: Script has been started and is smelting Runite Bars");
+				oreChosen1 = coalOre;
+				oreChosen2 = runiteOre;
+				oreAmount1 = 3;
+				oreAmount2 = 24;
+				barAmount = 3;
+				barResult = runeBar;
+				smithExp = 50;
+				magicExp = 53;
+			}
+			guiWait = false;
+			g.dispose();
+		}
+
+		private void initComponents() {
+			// JFormDesigner - Component initialization - DO NOT MODIFY  //GEN-BEGIN:initComponents
+			label1 = new JLabel();
+			oretoBar = new JComboBox<>();
+			button1 = new JButton();
+			label2 = new JLabel();
+
+			//======== this ========
+			Container contentPane = getContentPane();
+			contentPane.setLayout(null);
+
+			//---- label1 ----
+			label1.setText("AIO Super Heater");
+			label1.setFont(label1.getFont().deriveFont(label1.getFont().getSize() + 7f));
+			contentPane.add(label1);
+			label1.setBounds(80, 20, 205, 35);
+
+			//---- oretoBar ----
+			oretoBar.setModel(new DefaultComboBoxModel<>(new String[] {
+				"Bronze Bar",
+				"Iron Bar",
+				"Steel Bar",
+				"Gold Bar",
+				"Mithril Bar",
+				"Adamantine Bar",
+				"Runite Bar"
+			}));
+			contentPane.add(oretoBar);
+			oretoBar.setBounds(95, 90, 105, 25);
+
+			//---- button1 ----
+			button1.setText("Start");
+			button1.addActionListener(new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					button1ActionPerformed(e);
+				}
+			});
+			contentPane.add(button1);
+			button1.setBounds(90, 155, 115, 33);
+
+			//---- label2 ----
+			label2.setText("By ProteinPercentage");
+			contentPane.add(label2);
+			label2.setBounds(95, 55, 175, 20);
+
+			{ // compute preferred size
+				Dimension preferredSize = new Dimension();
+				for(int i = 0; i < contentPane.getComponentCount(); i++) {
+					Rectangle bounds = contentPane.getComponent(i).getBounds();
+					preferredSize.width = Math.max(bounds.x + bounds.width, preferredSize.width);
+					preferredSize.height = Math.max(bounds.y + bounds.height, preferredSize.height);
+				}
+				Insets insets = contentPane.getInsets();
+				preferredSize.width += insets.right;
+				preferredSize.height += insets.bottom;
+				contentPane.setMinimumSize(preferredSize);
+				contentPane.setPreferredSize(preferredSize);
+			}
+			pack();
+			setLocationRelativeTo(getOwner());
+			// JFormDesigner - End of component initialization  //GEN-END:initComponents
+		}
+
+		// JFormDesigner - Variables declaration - DO NOT MODIFY  //GEN-BEGIN:variables
+		private JLabel label1;
+		private JComboBox<String> oretoBar;
+		private JButton button1;
+		private JLabel label2;
+		// JFormDesigner - End of variables declaration  //GEN-END:variables
+	}
+}
+	
